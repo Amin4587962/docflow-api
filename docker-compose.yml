@@ -12,6 +12,25 @@ services:
       postgres:
         condition: service_healthy
 
+  redis:
+    image: redis:7-alpine
+    container_name: docflow-redis
+    ports:
+      - "6379:6379"
+      
+  worker:
+    build: .
+    container_name: docflow-worker
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    volumes:
+      - .:/code
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - postgres
+
+
   postgres:
     image: postgres:16-alpine
     container_name: docflow-postgres
