@@ -14,3 +14,8 @@ email-validator>=2.0.0
 python-multipart>=0.0.9
 celery[redis]
 redis
+pypdf
+python-docx
+PyMuPDF
+arabic-reshaper
+python-bidi
