@@ -1,6 +1,7 @@
 # app/schemas.py
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr
+from typing import Any
 
 
 # --- Token Schemas ---
@@ -48,7 +49,17 @@ class DocumentResponse(DocumentBase):
     id: int
     status: str
     owner_id: int
+    task_id: str | None = None  # Track Celery task ID
     created_at: datetime
 
     # Enable ORM mode to read directly from SQLAlchemy models
     model_config = ConfigDict(from_attributes=True)
+
+# Task status response schema
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    result: Any | None = None
+
+    class Config:
+        from_attributes = True

@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 from typing import List
 
+from celery.result import AsyncResult
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -13,7 +14,7 @@ from app.api.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.database import get_db
 from app.models import Document, User
-from app.schemas import DocumentResponse, Token, UserCreate, UserResponse
+from app.schemas import DocumentResponse, TaskStatusResponse, Token, UserCreate, UserResponse
 from app.workers.tasks import process_document
 
 # Ensure upload directory exists
@@ -118,7 +119,10 @@ async def upload_document(
     await db.refresh(new_doc)
 
     # Trigger background processing task
-    process_document.delay(new_doc.id)
+    task = process_document.delay(new_doc.id)
+    new_doc.task_id = task.id
+    await db.commit()
+    await db.refresh(new_doc)
 
     return new_doc
 
@@ -161,7 +165,54 @@ async def get_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
+
     return doc
+
+
+@app.get(
+    "/documents/{document_id}/task",
+    response_model=TaskStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get document processing task status",
+)
+async def get_document_task_status(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return Celery task status for a document."""
+    query = select(Document).where(
+        Document.id == document_id,
+        Document.owner_id == current_user.id,
+    )
+    result = await db.execute(query)
+    doc = result.scalars().first()
+
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    if not doc.task_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No task associated with this document",
+        )
+
+    # Fetch task status from Celery
+    task_res = AsyncResult(doc.task_id)
+    task_result = task_res.result if task_res.ready() else None
+
+    # Convert Celery exceptions to JSON-safe strings
+    if isinstance(task_result, Exception):
+        task_result = str(task_result)
+
+    return {
+        "task_id": doc.task_id,
+        "status": task_res.status,
+        "result": task_result,
+    }
 
 
 @app.get("/documents/{document_id}/download")

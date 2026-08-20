@@ -1,15 +1,15 @@
 import asyncio
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.models import Document
 from app.workers.celery_app import celery_app
 
 
 async def _process_document_async(document_id: int):
-    """Async helper to simulate document processing and update status."""
+    """Async helper to process document and update database status."""
     async with AsyncSessionLocal() as session:
-        # Fetch document by id
+        # Fetch target document
         result = await session.execute(
             select(Document).where(Document.id == document_id)
         )
@@ -18,14 +18,14 @@ async def _process_document_async(document_id: int):
         if not document:
             return f"Document {document_id} not found"
 
-        # Update status to processing
+        # Mark document as processing
         document.status = "processing"
         await session.commit()
 
-        # Simulate heavy processing work
+        # Simulate processing workload
         await asyncio.sleep(5)
 
-        # Update status to completed
+        # Mark document as completed
         document.status = "completed"
         await session.commit()
 
@@ -40,5 +40,12 @@ def test_task():
 
 @celery_app.task
 def process_document(document_id: int):
-    """Celery task entrypoint for document processing."""
-    return asyncio.run(_process_document_async(document_id))
+    """Celery task entrypoint handling event loop and connection cleanup."""
+    async def _runner():
+        try:
+            return await _process_document_async(document_id)
+        finally:
+            # Clean up connection pool for this event loop
+            await engine.dispose()
+
+    return asyncio.run(_runner())

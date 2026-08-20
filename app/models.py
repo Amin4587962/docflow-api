@@ -26,6 +26,8 @@ class Document(Base):
     file_size: Mapped[int] = mapped_column(Integer)
     content_type: Mapped[str] = mapped_column(String(100)) # e.g., application/pdf
     status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)
+    task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
