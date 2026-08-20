@@ -35,16 +35,20 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- Document Schemas ---
 class DocumentBase(BaseModel):
+    """Base schema containing common document metadata."""
     filename: str
     file_size: int
     content_type: str
 
 
 class DocumentResponse(DocumentBase):
+    """Schema for returning document details."""
     id: int
+    status: str
     owner_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    # Enable ORM mode to read directly from SQLAlchemy models
+    model_config = ConfigDict(from_attributes=True)

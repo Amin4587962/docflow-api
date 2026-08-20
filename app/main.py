@@ -2,17 +2,19 @@ import os
 import shutil
 from pathlib import Path
 from typing import List
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Query
+
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models import User, Document
-from app.schemas import UserCreate, UserResponse, Token, DocumentResponse
-from app.core.security import hash_password, verify_password, create_access_token
 from app.api.deps import get_current_user
+from app.core.security import create_access_token, hash_password, verify_password
+from app.database import get_db
+from app.models import Document, User
+from app.schemas import DocumentResponse, Token, UserCreate, UserResponse
+from app.workers.tasks import process_document
 
 # Ensure upload directory exists
 UPLOAD_DIR = Path("uploads")
@@ -91,7 +93,7 @@ async def upload_document(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload a new document for the authenticated user."""
+    """Upload a new document for the authenticated user and trigger processing."""
     user_upload_dir = UPLOAD_DIR / str(current_user.id)
     user_upload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -114,6 +116,9 @@ async def upload_document(
     db.add(new_doc)
     await db.commit()
     await db.refresh(new_doc)
+
+    # Trigger background processing task
+    process_document.delay(new_doc.id)
 
     return new_doc
 
