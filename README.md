@@ -450,6 +450,3 @@ Once the application is running, explore and test all endpoints directly in your
 ## 📌 License
 
 This repository was created for **educational and portfolio purposes**.
-
-Original user request:
-عالیی میتونی لطفا به صورت یه فایل بدی که تو vscode بازش کنم؟
