@@ -1,6 +1,7 @@
 import asyncio
 import re
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import fitz
@@ -55,6 +56,7 @@ def extract_pdf_text(file_path: str) -> str:
             pages_text.append("\n".join(page_lines))
 
         return "\n".join(pages_text)
+
     finally:
         pdf.close()
 
@@ -79,33 +81,85 @@ def extract_text(file_path: str) -> str:
 
 async def _process_document_async(document_id: int):
     """Process a document and update its status."""
+
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(Document).where(Document.id == document_id)
         )
         document = result.scalar_one_or_none()
 
-        if not document:
-            return f"Document {document_id} not found"
+        if document is None:
+            return {
+                "document_id": document_id,
+                "status": "not_found",
+                "error": f"Document {document_id} not found",
+            }
 
-        document.status = "processing"
-        await session.commit()
+        try:
+            # Mark document as processing
+            document.status = "processing"
+            document.error_message = None
+            await session.commit()
 
-        file_content = extract_text(document.file_path)
-        cleaned_content = clean_extracted_text(file_content)
+            # Main processing logic
+            file_content = extract_text(document.file_path)
 
-        document.status = "completed"
-        await session.commit()
+            # Error Manage
+            # raise RuntimeError("Controlled test error for failure handling")
 
-        return {
-            "document_id": document_id,
-            "status": document.status,
-            "result": {
-                "text": cleaned_content,
-                "character_count": len(cleaned_content),
-                "word_count": len(cleaned_content.split()),
-            },
-        }
+            cleaned_content = clean_extracted_text(file_content)
+
+            # Success updates
+            document.status = "completed"
+            document.error_message = None
+            document.processed_at = datetime.utcnow()
+
+            await session.commit()
+
+            return {
+                "document_id": document_id,
+                "status": "completed",
+                "result": {
+                    "text": cleaned_content,
+                    "character_count": len(cleaned_content),
+                    "word_count": len(cleaned_content.split()),
+                },
+            }
+
+        except Exception as e:
+            error_message = str(e)
+
+            # Restore the session to a usable state
+            await session.rollback()
+
+            # پس از rollback، سند را دوباره از دیتابیس دریافت می‌کنیم
+            result = await session.execute(
+                select(Document).where(Document.id == document_id)
+            )
+            document = result.scalar_one_or_none()
+
+            if document is None:
+                return {
+                    "document_id": document_id,
+                    "status": "failed",
+                    "error": (
+                        f"Document {document_id} could not be found "
+                        "after processing failure"
+                    ),
+                }
+
+            # Save error information in database
+            document.status = "failed"
+            document.error_message = error_message
+            document.processed_at = datetime.utcnow()
+
+            await session.commit()
+
+            return {
+                "document_id": document_id,
+                "status": "failed",
+                "error": error_message,
+            }
 
 
 @celery_app.task

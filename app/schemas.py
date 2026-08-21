@@ -49,9 +49,12 @@ class DocumentResponse(DocumentBase):
     status: str
     owner_id: int
     task_id: str | None = None
+    error_message: str | None = None
     created_at: datetime
+    processed_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class TaskStatusResponse(BaseModel):

@@ -24,13 +24,12 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(255))
     file_path: Mapped[str] = mapped_column(String(500))
     file_size: Mapped[int] = mapped_column(Integer)
-    content_type: Mapped[str] = mapped_column(String(100)) # e.g., application/pdf
+    content_type: Mapped[str] = mapped_column(String(100))
     status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)
     task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    
+    error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-    # Many-to-one: document belongs to one user
     owner: Mapped["User"] = relationship(back_populates="documents")

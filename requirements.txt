@@ -19,3 +19,5 @@ python-docx
 PyMuPDF
 arabic-reshaper
 python-bidi
+pytest
+httpx
