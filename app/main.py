@@ -17,7 +17,6 @@ from app.models import Document, User
 from app.schemas import DocumentResponse, TaskStatusResponse, Token, UserCreate, UserResponse
 from app.workers.tasks import process_document
 
-# Ensure upload directory exists
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -167,6 +166,36 @@ async def get_document(
         )
 
     return doc
+
+
+@app.get(
+    "/documents/{document_id}/status",
+    status_code=status.HTTP_200_OK,
+    summary="Get document processing status",
+)
+async def get_document_status(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the processing status stored for a document."""
+    query = select(Document).where(
+        Document.id == document_id,
+        Document.owner_id == current_user.id,
+    )
+    result = await db.execute(query)
+    doc = result.scalars().first()
+
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    return {
+        "document_id": doc.id,
+        "status": doc.status,
+    }
 
 
 @app.get(

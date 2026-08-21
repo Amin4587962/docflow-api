@@ -1,7 +1,7 @@
-# app/schemas.py
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 # --- Token Schemas ---
@@ -28,11 +28,10 @@ class UserCreate(UserBase):
 
 
 class UserResponse(UserBase):
-    """Schema for returning user data (excludes password)."""
+    """Schema for returning user data without password."""
     id: int
     created_at: datetime
 
-    # Enable ORM mode to read directly from SQLAlchemy models
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -49,17 +48,16 @@ class DocumentResponse(DocumentBase):
     id: int
     status: str
     owner_id: int
-    task_id: str | None = None  # Track Celery task ID
+    task_id: str | None = None
     created_at: datetime
 
-    # Enable ORM mode to read directly from SQLAlchemy models
     model_config = ConfigDict(from_attributes=True)
 
-# Task status response schema
+
 class TaskStatusResponse(BaseModel):
+    """Schema for returning Celery task status and result."""
     task_id: str
     status: str
     result: Any | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
